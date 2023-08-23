@@ -111,8 +111,9 @@ impl Mem for Bus {
             },
             0x4014 => {
                 let mut oam_dma = [0; 256];
+                let base_addr = ((data as usize) << 8) & 0x07FF;
                 for i in 0..256 {
-                    oam_dma[i] = self.cpu_vram[((data as usize) << 8) + i];
+                    oam_dma[i] = self.cpu_vram[base_addr + i];
                 }
                 self.ppu.write_oam_dma(&oam_dma);
             },

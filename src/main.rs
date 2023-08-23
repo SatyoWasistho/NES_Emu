@@ -115,18 +115,16 @@ functionality for the duration of a single screen update.
 #[inline(always)]
 fn update(cpu_6502: &mut CPU, frame: &mut display::Frame){
     *frame = display::Frame::new(display::SYSTEM_PALLETE[cpu_6502.mem_bus.ppu.palette_table[0] as usize]);
-    while cpu_6502.mem_bus.ppu.stat & 0x40 == 0  {
-        cpu_6502.interpret();
+    let mut scanline = 0;
+    while cpu_6502.mem_bus.ppu.scanlines <= 240 {
+        scanline += 8;
+        display::render(&cpu_6502.mem_bus.ppu, frame, scanline - 8, scanline);
+        while (cpu_6502.mem_bus.ppu.scanlines as usize) < scanline{
+            cpu_6502.interpret();
+        }
     }
-    let scanline = cpu_6502.mem_bus.ppu.scanlines as usize;
-    display::render(&cpu_6502.mem_bus.ppu, frame, 0, scanline);
-    while !cpu_6502.nmi_flag {
-        cpu_6502.interpret();
-    }
-    
-    display::render(&cpu_6502.mem_bus.ppu, frame, scanline, 240);
 
-    while cpu_6502.nmi_flag {
+    while cpu_6502.mem_bus.ppu.scanlines > 240 {
         cpu_6502.interpret();
     }
     

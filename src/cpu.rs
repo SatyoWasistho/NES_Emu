@@ -311,20 +311,21 @@ impl CPU {
             println!("\tStatus(old) = {:x?}", self.reg_stat);
         }
         let cin = self.reg_stat & 0x01;
-        let res = self.reg_a as u16 + val as u16 + cin as u16;
-        let cout = ((res & 0x0100) >> 8) as u8;
-        self.reg_a = (res & 0xFF) as u8;
-        if cout != 0 {
+        let res = u16::from(self.reg_a) + u16::from(val) + u16::from(cin);
+        let cout = res > 0xFF;
+        let res8 = (res & 0xFF) as u8;
+        if cout {
             self.reg_stat |= 0x01;
         } else {
             self.reg_stat &= 0xFE;
         }
-        if cin + cout == 1 {
+        if ((self.reg_a ^ res8) & (res8 ^ val) & 0x80) == 0x80 {
             self.reg_stat |= 0x40;
         } else {
             self.reg_stat &= 0xBF;
         }
 
+        self.reg_a = res8;
         self.update_nz(self.reg_a);
         if self.debug {
             println!("\tAccumulator(new) = {:x?}", self.reg_a);
@@ -347,19 +348,20 @@ impl CPU {
         }
         let cin = self.reg_stat & 0x01;
         let res = self.reg_a as u16 + !val as u16 + cin as u16;
-        let cout = ((res & 0x0100) >> 8) as u8;
-        self.reg_a = (res & 0xFF) as u8;
-        if cout != 0 {
+        let cout = res > 0xFF;
+        let res8 = (res & 0xFF) as u8;
+        if cout {
             self.reg_stat |= 0x01;
         } else {
             self.reg_stat &= 0xFE;
         }
-        if cin + cout == 1 {
+        if (self.reg_a ^ res8) & (self.reg_a ^ val) & 0x80 == 0x80 {
             self.reg_stat |= 0x40;
         } else {
             self.reg_stat &= 0xBF;
         }
 
+        self.reg_a = res8;
         self.update_nz(self.reg_a);
         if self.debug {
             println!("\tAccumulator(new) = {:x?}", self.reg_a);

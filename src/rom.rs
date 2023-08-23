@@ -47,6 +47,9 @@ impl Rom {
         let prg_rom_size = raw[4] as u16 * PRG_ROM_PAGE_SIZE;
         let chr_rom_size = raw[5] as u16 * CHR_ROM_PAGE_SIZE;
 
+        println!("Program Rom Size: {} bytes", prg_rom_size);
+        println!("Character Rom Size: {} bytes", chr_rom_size);
+
         let prg_rom_start: u16 = 0x0010 + 0x0080 * (raw[6] & 0x04) as u16;
         let chr_rom_start: u16 = prg_rom_start + prg_rom_size;
 

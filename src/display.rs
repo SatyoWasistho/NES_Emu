@@ -114,7 +114,7 @@ pub struct Frame {
     }
  }
  #[inline(always)]
- pub fn show_sprite_tile(frame: &mut Frame, chr_rom: &Vec<u8>, bank: usize, tile_n: usize, x_offset: usize, y_offset: usize, flip_vertical: bool, flip_horizontal: bool, palette: [u8; 4]) {
+ pub fn show_sprite_tile(frame: &mut Frame, chr_rom: &Vec<u8>, bank: usize, tile_n: usize, x_offset: usize, y_offset: usize, flip_vertical: bool, flip_horizontal: bool, palette: [u8; 4], scanline_start: usize, scanline_stop: usize) {
     if bank > 1 {
         return;
     }
@@ -126,17 +126,19 @@ pub struct Frame {
         let mut upper = tile[y];
         let mut lower = tile[y + 8];
  
-        for x in (0..=7).rev() {
-            let value = (1 & upper) << 1 | (1 & lower);
-            upper >>= 1;
-            lower >>= 1;
-            let rgb = SYSTEM_PALLETE[palette[value as usize] as usize];
-            if value > 0 {
-                match (flip_horizontal, flip_vertical) {
-                    (false, false) => frame.set_pixel(x_offset + x, y_offset + y, rgb),
-                    (true, false) => frame.set_pixel(x_offset + 7 - x, y_offset + y, rgb),
-                    (false, true) => frame.set_pixel(x_offset + x, y_offset + 7 - y, rgb),
-                    (true, true) => frame.set_pixel(x_offset + 7 - x, y_offset + 7 - y, rgb),
+        if y_offset + y >= scanline_start &&  y_offset + y <= scanline_stop {
+            for x in (0..=7).rev() {
+                let value = (1 & upper) << 1 | (1 & lower);
+                upper >>= 1;
+                lower >>= 1;
+                let rgb = SYSTEM_PALLETE[palette[value as usize] as usize];
+                if value > 0 {
+                    match (flip_horizontal, flip_vertical) {
+                        (false, false) => frame.set_pixel(x_offset + x, y_offset + y, rgb),
+                        (true, false) => frame.set_pixel(x_offset + 7 - x, y_offset + y, rgb),
+                        (false, true) => frame.set_pixel(x_offset + x, y_offset + 7 - y, rgb),
+                        (true, true) => frame.set_pixel(x_offset + 7 - x, y_offset + 7 - y, rgb),
+                    }
                 }
             }
         }
@@ -145,11 +147,11 @@ pub struct Frame {
 
  pub fn render(ppu: &PPU, frame: &mut Frame, scanline_start: usize, scanline_stop: usize) {
     
-    let scroll_x = ppu.scroll.val.1 as usize;
-    let scroll_y = ppu.scroll.val.0 as usize;
+    let scroll_x = ppu.scroll_x as usize;
+    let scroll_y = ppu.scroll_y as usize;
     let bg_bank = ((ppu.ctrl & 0x10) >> 4) as usize;
 
-    let (main_nametable, second_nametable) = match (&ppu.mirroring, ppu.ctrl & 0x03) {
+    let (main_nametable, second_nametable) = match (&ppu.mirroring, (ppu.v & 0x0C00) >> 10) {
         (Mirroring::FOUR_SCREEN,_) => {
             (0x0000, 0x0000)
         },
@@ -179,14 +181,14 @@ pub struct Frame {
             if ppu.ctrl & 0x20 == 0 {
                 let sprite_bank = ((ppu.ctrl & 0x08) >> 3) as usize;
 
-                show_sprite_tile(frame, &ppu.chr_rom, sprite_bank, tile_idx as usize, tile_x, tile_y, flip_vertical, flip_horizontal, sprite_palette);
+                show_sprite_tile(frame, &ppu.chr_rom, sprite_bank, tile_idx as usize, tile_x, tile_y, flip_vertical, flip_horizontal, sprite_palette, scanline_start, scanline_stop);
             } else {
                 if flip_vertical {
-                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize | 0x01, tile_x, tile_y, flip_vertical, flip_horizontal, sprite_palette);
-                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize & 0xFE, tile_x, tile_y + 8, flip_vertical, flip_horizontal, sprite_palette);
+                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize | 0x01, tile_x, tile_y, flip_vertical, flip_horizontal, sprite_palette, scanline_start, scanline_stop);
+                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize & 0xFE, tile_x, tile_y + 8, flip_vertical, flip_horizontal, sprite_palette, scanline_start, scanline_stop);
                 } else {
-                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize & 0xFE, tile_x, tile_y, flip_vertical, flip_horizontal, sprite_palette);
-                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize | 0x01, tile_x, tile_y + 8, flip_vertical, flip_horizontal, sprite_palette);
+                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize & 0xFE, tile_x, tile_y, flip_vertical, flip_horizontal, sprite_palette, scanline_start, scanline_stop);
+                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize | 0x01, tile_x, tile_y + 8, flip_vertical, flip_horizontal, sprite_palette, scanline_start, scanline_stop);
                 }
             }
         }
@@ -289,14 +291,14 @@ pub struct Frame {
             if ppu.ctrl & 0x20 == 0 {
                 let sprite_bank = ((ppu.ctrl & 0x08) >> 3) as usize;
 
-                show_sprite_tile(frame, &ppu.chr_rom, sprite_bank, tile_idx as usize, tile_x, tile_y, flip_vertical, flip_horizontal, sprite_palette);
+                show_sprite_tile(frame, &ppu.chr_rom, sprite_bank, tile_idx as usize, tile_x, tile_y, flip_vertical, flip_horizontal, sprite_palette, scanline_start, scanline_stop);
             } else {
                 if flip_vertical {
-                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize | 0x01, tile_x, tile_y, flip_vertical, flip_horizontal, sprite_palette);
-                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize & 0xFE, tile_x, tile_y + 8, flip_vertical, flip_horizontal, sprite_palette);
+                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize | 0x01, tile_x, tile_y, flip_vertical, flip_horizontal, sprite_palette, scanline_start, scanline_stop);
+                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize & 0xFE, tile_x, tile_y + 8, flip_vertical, flip_horizontal, sprite_palette, scanline_start, scanline_stop);
                 } else {
-                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize & 0xFE, tile_x, tile_y, flip_vertical, flip_horizontal, sprite_palette);
-                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize | 0x01, tile_x, tile_y + 8, flip_vertical, flip_horizontal, sprite_palette);
+                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize & 0xFE, tile_x, tile_y, flip_vertical, flip_horizontal, sprite_palette, scanline_start, scanline_stop);
+                    show_sprite_tile(frame, &ppu.chr_rom, tile_idx as usize & 0x01, tile_idx as usize | 0x01, tile_x, tile_y + 8, flip_vertical, flip_horizontal, sprite_palette, scanline_start, scanline_stop);
                 }
             }
         }

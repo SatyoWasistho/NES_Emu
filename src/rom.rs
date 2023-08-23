@@ -6,8 +6,8 @@ pub enum Mirroring {
 }
 
 const NES_TAG: [u8; 4] = [0x4E, 0x45, 0x53, 0x1A];
-const PRG_ROM_PAGE_SIZE: u16 = 0x4000;
-const CHR_ROM_PAGE_SIZE: u16 = 0x2000;
+const PRG_ROM_PAGE_SIZE: usize = 0x4000;
+const CHR_ROM_PAGE_SIZE: usize = 0x2000;
 
 pub struct Rom {
     pub prg_rom: Vec<u8>,
@@ -44,14 +44,14 @@ impl Rom {
             screen_mirroring = Mirroring::HORIZONTAL;
         }
 
-        let prg_rom_size = raw[4] as u16 * PRG_ROM_PAGE_SIZE;
-        let chr_rom_size = raw[5] as u16 * CHR_ROM_PAGE_SIZE;
+        let prg_rom_size = raw[4] as usize * PRG_ROM_PAGE_SIZE;
+        let chr_rom_size = raw[5] as usize * CHR_ROM_PAGE_SIZE;
 
         println!("Program Rom Size: {} bytes", prg_rom_size);
         println!("Character Rom Size: {} bytes", chr_rom_size);
 
-        let prg_rom_start: u16 = 0x0010 + 0x0080 * (raw[6] & 0x04) as u16;
-        let chr_rom_start: u16 = prg_rom_start + prg_rom_size;
+        let prg_rom_start: usize = 0x0010 + 0x0080 * (raw[6] & 0x04) as usize;
+        let chr_rom_start: usize = prg_rom_start + prg_rom_size;
 
         Rom {
             prg_rom: raw[prg_rom_start as usize..(prg_rom_start + prg_rom_size) as usize].to_vec(),

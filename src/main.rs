@@ -46,7 +46,7 @@ Startup Function:
 Runs once during the first frame of execution. Initializes all
 emulated hardware components
 */
-fn startup(frame: &mut display::Frame) -> CPU {
+fn startup() -> CPU {
 
     //Prompt User to select rom (via file dialog box)
     let mut filename = FileDialog::new()
@@ -66,37 +66,6 @@ fn startup(frame: &mut display::Frame) -> CPU {
     //generate CPU
     let mut cpu_6502 = CPU::new(bus);
     cpu_6502.reset();
-
-    //generate Display
-    //use basic tileset for default screen
-    let mut x = 0;
-    let mut y = 0;
-    for bank in 0..2 {
-        for tile_n in 0..256 {
-            display::show_tile(
-                frame, 
-                &cpu_6502.mem_bus.ppu.chr_rom, 
-                bank, 
-                tile_n, 
-                display::Rect {
-                    x1: 0,
-                    y1: 0,
-                    x2: 256,
-                    y2: 240
-                },
-                x, 
-                y, 
-                0,
-                0,
-                [0x01, 0x23, 0x27, 0x30]
-            );
-            x += 8;
-            if x >= SCREEN_WIDTH as usize {
-                x = 0;
-                y += 8;
-            }
-        }
-    }
 
     /*
     output CPU as return value. CPU is already connected 
@@ -144,7 +113,7 @@ Application Loop Logic -
 fn compute_thread(tx: mpsc::SyncSender<[u8; (SCREEN_HEIGHT * SCREEN_WIDTH * 4) as usize]>, rx: mpsc::Receiver<Option<KeyboardInput>>) {
     //Initialize Display Frame, CPU (+ Peripherals), and Input Container
     let mut frame = display::Frame::new((0, 0, 0));
-    let mut cpu_6502 = startup(&mut frame);
+    let mut cpu_6502 = startup();
     tx.send(frame.data).unwrap();
     let mut input_option = rx.recv().unwrap();
 

@@ -32,8 +32,6 @@ pub struct PPU {
     pub scanlines: u16,
 
     pub nmi_interrupt: bool,
-
-    pub frame: [u8; 256 * 240 * 4],
 }
 
 impl PPU {
@@ -124,7 +122,6 @@ impl PPU {
 
             nmi_interrupt: false,
 
-            frame: [0xFF; 256 * 240 * 4]
         }
     }
 
@@ -175,56 +172,6 @@ impl PPU {
                 self.cycles = 0;
                 self.scanlines += 1;
             }
-            if self.cycles < 256 && self.scanlines < 240 {
-                let bg_bank = ((self.ctrl & 0x10) >> 4) as usize;
-
-                let (main_nametable, second_nametable) = match (&self.mirroring, (self.v & 0x0C00) >> 10) {
-                    (Mirroring::FOUR_SCREEN,_) => {
-                        (0x0000, 0x0000)
-                    },
-                    (_, 0x00) | (Mirroring::VERTICAL, 0x02) |
-                    (Mirroring::HORIZONTAL, 0x01) => {
-                        (0x0000, 0x0400)
-                    },
-                    (Mirroring::VERTICAL, 0x01) | (_, 0x03) |
-                    (Mirroring::HORIZONTAL, 0x02) => {
-                        (0x0400, 0x0000)
-                    },(_,_) => {
-                        (0x0000, 0x0000)
-                    },
-                };
-                let tile_x = (self.cycles as usize + self.scroll_x as usize) >> 3;
-                let tile_y = (self.scanlines as usize + self.scroll_y as usize) >> 3;
-                let idx = (tile_y << 5) + tile_x;
-                let tile_y_off = (self.scanlines as usize + self.scroll_y as usize) & 0x0007;
-                let tile_x_off = (self.cycles as usize + self.scroll_x as usize) & 0x0007;
-                let mut tile_n: usize;
-                let mut palette: [u8; 4];
-                if (
-                    (tile_x * 8 + tile_x_off) >= self.scroll_x as usize &&
-                    (tile_x * 8 + tile_x_off) <  256           &&
-                    (tile_y * 8 + tile_y_off) >= self.scroll_y as usize &&
-                    (tile_y * 8 + tile_y_off) <  240
-                ){
-                    tile_n = self.vram[(idx + main_nametable) % 2048] as usize;
-                    palette = self.bg_palette(main_nametable, tile_x, tile_y);
-                } else {
-                    tile_n = self.vram[(idx + second_nametable) % 2048] as usize;
-                    palette = self.bg_palette(second_nametable, tile_x, tile_y);
-                }
-                let tile: &[u8] = &self.chr_rom[(bg_bank * 0x1000 + tile_n * 16)..=(bg_bank * 0x1000 + tile_n * 16 + 15)];
-                let upper = tile[tile_y_off];
-                let lower = tile[tile_y_off + 8];
-                let bg_value = ((upper << tile_x_off) & 0x80) >> 6 | ((lower << tile_x_off) & 0x80) >> 7;
-                let bg_rgb = SYSTEM_PALLETE[palette[bg_value as usize] as usize];
-                let base = (self.scanlines as usize) * 4 * 256 + ((self.cycles) as usize) * 4;
-                if base < self.frame.len() {
-                    self.frame[base] = bg_rgb.0;
-                    self.frame[base + 1] = bg_rgb.1;
-                    self.frame[base + 2] = bg_rgb.2;
-                }
-
-            }
         }
         if self.scanlines == 241 {
             self.stat |= 0x80;
@@ -241,26 +188,6 @@ impl PPU {
             return true;
         }
         false
-    }
-
-    pub fn bg_palette(&self, name_table_offset: usize, x: usize, y: usize) -> [u8; 4] {
-        let attr_table_idx: usize = y / 4 * 8 + x / 4;
-        let attr_byte: u8 = self.vram[(0x03C0 + attr_table_idx + name_table_offset) % 2048];
-
-        let palette_idx: u8 = match ((x % 4) >> 1) + ((y % 4) & 2) {
-            0 => attr_byte & 0b11,
-        1 => (attr_byte >> 2) & 0b11,
-        2 => (attr_byte >> 4) & 0b11,
-        3 => (attr_byte >> 6) & 0b11,
-        _ => panic!("should not happen"),
-        };
-        let palette_start: usize = (1 + palette_idx * 4) as usize;
-        [
-            self.palette_table[0],
-            self.palette_table[palette_start + 1],
-            self.palette_table[palette_start + 0],
-            self.palette_table[palette_start + 2],
-        ]
     }
 
     fn is_sprite_0_hit(&self, cycle: usize) -> bool {
